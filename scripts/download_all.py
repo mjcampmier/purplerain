@@ -1,14 +1,22 @@
-"""Download raw PurpleAir data for every sensor listed in ``history.feather``.
+"""Download raw PurpleAir data for every sensor in a deployment history table.
+
+The history table (feather or CSV, optionally gzipped) needs the columns
+purpleair_sensor_index, private_key, effective_date and discontinue_date.
 
 Configuration is read from environment variables, which may be set in a ``.env``
 file at the repository root (see ``.env.example``):
 
     PURPLEAIR_API_KEY    PurpleAir API read key (required)
-    PURPLERAIN_DATA_DIR  Directory containing history.feather (or pass --data-dir)
+    PURPLERAIN_DATA_DIR  Directory containing history.feather (or pass --data-dir,
+                         or both --history and --output-dir)
 
-Example:
+Examples:
 
-    python scripts/download_all.py --start 2025-10-01 --end 2026-03-31
+    python scripts/download_all.py --start 2025-10-01 --end 2025-11-01
+    python scripts/download_all.py --history sensors.csv.gz --output-dir data \
+        --start 2025-10-01 --end 2025-11-01
+
+Exits with status 1 if any chunk failed to download.
 """
 
 from __future__ import annotations
@@ -47,6 +55,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="directory containing history.feather (default: $PURPLERAIN_DATA_DIR)",
     )
     parser.add_argument(
+        "--history",
+        type=Path,
+        help="sensor history table, .feather or .csv[.gz] "
+        "(default: <data-dir>/history.feather)",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         help="where downloaded data is written (default: --data-dir)",
@@ -78,10 +92,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--chunk-days", type=int, default=30)
     args = parser.parse_args(argv)
 
-    if args.data_dir is None:
-        parser.error("set PURPLERAIN_DATA_DIR in .env or pass --data-dir")
+    if args.data_dir is None and (args.history is None or args.output_dir is None):
+        parser.error(
+            "set PURPLERAIN_DATA_DIR in .env, pass --data-dir, "
+            "or pass both --history and --output-dir"
+        )
+    args.history = args.history or args.data_dir / "history.feather"
     args.output_dir = args.output_dir or args.data_dir
     return args
+
+
+def read_history(path: Path) -> pd.DataFrame:
+    """Read the sensor history table from a feather or (gzipped) CSV file."""
+    if path.suffix == ".feather":
+        return pd.read_feather(path)
+    return pd.read_csv(
+        path,
+        usecols=list(HISTORY_COLUMNS),
+        parse_dates=["effective_date", "discontinue_date"],
+        dtype={"private_key": "string"},
+    )
 
 
 def build_download_table(
@@ -127,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         ],
     )
 
-    history = pd.read_feather(args.data_dir / "history.feather")
+    history = read_history(args.history)
     sensors = build_download_table(history, args.installed_after, args.start, args.end)
 
     with PurpleAirClient() as client, logging_redirect_tqdm():

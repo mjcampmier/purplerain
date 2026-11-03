@@ -216,7 +216,10 @@ class PurpleAirNetworkDownloader:
 
         downloaded = skipped = empty = failed = 0
         for sensor, chunk_start, chunk_end in tqdm(
-            plan, desc="Downloading", unit="chunk"
+            plan,
+            desc="Downloading",
+            unit="chunk",
+            disable=None,  # off when not a TTY
         ):
             if self._is_chunk_downloaded(sensor.sensor_id, chunk_start, chunk_end):
                 skipped += 1

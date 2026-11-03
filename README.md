@@ -1,9 +1,11 @@
 # purplerain
 
+[![CI](https://github.com/mjcampmier/purplerain/actions/workflows/ci.yml/badge.svg)](https://github.com/mjcampmier/purplerain/actions/workflows/ci.yml)
+
 Resumable bulk downloads of historical data from the [PurpleAir API](https://api.purpleair.com/).
 
 - `PurpleAirClient`: a small API client with retries, rate limiting, and support for private sensors (read keys).
-- `PurpleAirNetworkDownloader`: downloads long histories for many sensors in fixed-size chunks. It records progress after every chunk, so an interrupted run picks up where it left off.
+- `PurpleAirNetworkDownloader`: downloads long histories for many sensors in month-aligned chunks and never overwrites existing files. It records progress after every chunk, so an interrupted run picks up where it left off.
 
 ## Installation
 
@@ -37,11 +39,17 @@ Never commit `.env` or put API keys directly in source files.
 `scripts/download_all.py` reads the sensor list from `$PURPLERAIN_DATA_DIR/history.feather` and downloads raw data into the same directory:
 
 ```bash
-python scripts/download_all.py --start 2025-10-01 --end 2026-03-31
+python scripts/download_all.py --start 2025-10-01 --end 2025-11-01
 python scripts/download_all.py --help
 ```
 
-You can re-run the same command to resume an interrupted download or retry failed chunks.
+`--end` is exclusive. To read the sensor table from another file (feather or CSV, optionally gzipped) or write elsewhere, pass `--history` and `--output-dir`.
+
+You can re-run the same command to resume an interrupted download or retry failed chunks. The script exits with status 1 if any chunk failed.
+
+### GitHub Actions
+
+`.github/workflows/` contains a CI workflow (lint and tests) and a download workflow that fetches the previous month's data on a schedule. The download workflow can also be started manually for any date range. See [docs/github-actions.md](docs/github-actions.md) for setup, including how to store the API key and sensor table as repository secrets.
 
 ### Library
 

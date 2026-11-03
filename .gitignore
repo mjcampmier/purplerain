@@ -28,3 +28,7 @@ download.log
 .idea/
 .vscode/
 .DS_Store
+
+# Local download output (e.g. from scripts or `gh run download`)
+/data/
+/downloads/
