@@ -1,0 +1,111 @@
+# Downloads raw PurpleAir data for the sensor network and uploads it as a
+# workflow artifact. Setup and usage: docs/github-actions.md
+#
+# Required repository secrets:
+#   PURPLEAIR_API_KEY        PurpleAir API read key
+#   PURPLERAIN_SENSOR_TABLE  base64 of the gzipped sensor history CSV
+#
+# Downloaded data from private sensors ends up in the run's artifact. Only run
+# this workflow in a PRIVATE repository.
+
+name: Download PurpleAir data
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start date, inclusive (YYYY-MM-DD). Blank: first day of last month."
+        required: false
+        default: ""
+      end:
+        description: "End date, exclusive (YYYY-MM-DD). Blank: first day of this month."
+        required: false
+        default: ""
+      installed_after:
+        description: "Only include sensors installed on or after this date."
+        required: false
+        default: "2024-03-01"
+  schedule:
+    # 06:00 UTC on the 2nd of every month: downloads the previous calendar month.
+    - cron: "0 6 2 * *"
+
+permissions:
+  contents: read
+
+# One download at a time, to stay within PurpleAir's rate limits.
+concurrency:
+  group: purpleair-download
+  cancel-in-progress: false
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: pip install .
+
+      - name: Resolve download window
+        id: window
+        env:
+          INPUT_START: ${{ inputs.start }}
+          INPUT_END: ${{ inputs.end }}
+        run: |
+          this_month="$(date -u +%Y-%m-01)"
+          start="${INPUT_START:-$(date -u -d "$this_month -1 month" +%Y-%m-%d)}"
+          end="${INPUT_END:-$this_month}"
+          echo "start=$start" >> "$GITHUB_OUTPUT"
+          echo "end=$end" >> "$GITHUB_OUTPUT"
+          echo "### PurpleAir download: $start to $end (UTC, end exclusive)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Decode sensor table
+        env:
+          SENSOR_TABLE: ${{ secrets.PURPLERAIN_SENSOR_TABLE }}
+        run: |
+          if [ -z "$SENSOR_TABLE" ]; then
+            echo "::error::Secret PURPLERAIN_SENSOR_TABLE is not set. See docs/github-actions.md."
+            exit 1
+          fi
+          printf '%s' "$SENSOR_TABLE" | base64 --decode > "$RUNNER_TEMP/sensors.csv.gz"
+          # Mask every sensor read key so none can appear in the logs.
+          python - "$RUNNER_TEMP/sensors.csv.gz" <<'EOF'
+          import sys
+          import pandas as pd
+          for key in pd.read_csv(sys.argv[1], usecols=["private_key"]).private_key.dropna().unique():
+              print(f"::add-mask::{key}")
+          EOF
+
+      - name: Download
+        env:
+          PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
+          START: ${{ steps.window.outputs.start }}
+          END: ${{ steps.window.outputs.end }}
+          INSTALLED_AFTER: ${{ inputs.installed_after || '2024-03-01' }}
+        run: |
+          python scripts/download_all.py \
+            --history "$RUNNER_TEMP/sensors.csv.gz" \
+            --output-dir data \
+            --start "$START" \
+            --end "$END" \
+            --installed-after "$INSTALLED_AFTER"
+
+      - name: Summarize
+        if: always()
+        run: |
+          grep -hE "Planning|Done:|chunks failed" data/download.log >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload data
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: purpleair-${{ steps.window.outputs.start }}-to-${{ steps.window.outputs.end }}
+          path: data/
+          retention-days: 90
