@@ -19,8 +19,10 @@ from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
+#: Environment variable read when no API key is passed to :class:`PurpleAirClient`.
 API_KEY_ENV_VAR = "PURPLEAIR_API_KEY"
 
+#: Fields requested when ``fields`` is not given.
 DEFAULT_FIELDS: tuple[str, ...] = (
     "pm2.5_cf_1_a",
     "pm2.5_cf_1_b",

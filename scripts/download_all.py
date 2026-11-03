@@ -43,9 +43,12 @@ HISTORY_COLUMNS = {
 }
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
+    """Command-line interface definition (also used to generate the docs)."""
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog="download_all.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     data_dir = os.environ.get("PURPLERAIN_DATA_DIR")
     parser.add_argument(
@@ -89,7 +92,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="2022-03-10",
         help="windows ending before this date are requested without a read key",
     )
-    parser.add_argument("--chunk-days", type=int, default=30)
+    parser.add_argument(
+        "--chunk-days",
+        type=int,
+        default=30,
+        help="maximum days per request; PurpleAir allows at most 30 for raw data",
+    )
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.data_dir is None and (args.history is None or args.output_dir is None):

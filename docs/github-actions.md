@@ -1,11 +1,12 @@
 # Running purplerain on GitHub Actions
 
-The repository includes two workflows in `.github/workflows/`:
+The repository includes three workflows in `.github/workflows/`:
 
 | Workflow | File | Triggers | Secrets |
 | --- | --- | --- | --- |
 | **CI** | `ci.yml` | Every push to `main`/`master` and every pull request | None |
 | **Download PurpleAir data** | `download.yml` | Monthly schedule and manual runs | `PURPLEAIR_API_KEY`, `PURPLERAIN_SENSOR_TABLE` |
+| **Docs** | `docs.yml` | Every push to `main`/`master`, every pull request, and manual runs | None |
 
 ## CI
 
@@ -25,8 +26,7 @@ ruff check . && ruff format --check . && pytest
 
 ## Data download workflow
 
-> [!WARNING]
-> **Run the download workflow only in a private repository.** It uploads the downloaded data as a workflow artifact, and anyone who can read the repository can download artifacts and read run logs. Read keys are masked in the logs, but the sensor data itself is not, and data from private sensors should stay private.
+> **Warning: run the download workflow only in a private repository.** It uploads the downloaded data as a workflow artifact, and anyone who can read the repository can download artifacts and read run logs. Read keys are masked in the logs, but the sensor data itself is not, and data from private sensors should stay private.
 
 ### What it does
 
@@ -148,4 +148,32 @@ Don't merge the `download_progress.feather` files. Each one only describes its o
 | How often it runs | The `cron` line in `download.yml` |
 | Which sensors are included | The `installed_after` default, or the sensor table itself |
 | Where the data goes | Replace the "Upload data" step, for example with a step that syncs `data/` to S3 or Google Cloud Storage |
-| Fields or averaging period | `scripts/download_all.py`, or call `PurpleAirNetworkDownloader` from your own script (see the [README](../README.md#library)) |
+| Fields or averaging period | `scripts/download_all.py`, or call `PurpleAirNetworkDownloader` from your own script (see [Usage](usage.md#library)) |
+
+## Documentation site
+
+`docs.yml` builds this site with [Sphinx](https://www.sphinx-doc.org/) and publishes it to GitHub Pages at <https://mjcampmier.github.io/purplerain/>.
+
+- **Pull requests:** the site is built but not published. The build fails on any Sphinx warning, so broken links and bad cross-references are caught in review.
+- **Pushes to the default branch** (and manual runs from it): the site is built and published.
+
+### One-time setup
+
+Turn on GitHub Pages with GitHub Actions as the source, either under **Settings → Pages → Build and deployment → Source: GitHub Actions**, or from the command line:
+
+```bash
+gh api -X POST repos/mjcampmier/purplerain/pages -f build_type=workflow
+```
+
+> **Note:** Publishing Pages from a private repository requires a paid GitHub plan (Pro, Team or Enterprise). Even then, the published site is **public** unless your organization is on Enterprise Cloud with private Pages. The docs contain no secrets or data, but keep that in mind before adding anything sensitive.
+
+### Building locally
+
+```bash
+pip install -e ".[docs]"
+sphinx-build -W -b html docs docs/_build/html
+open docs/_build/html/index.html        # macOS; use xdg-open on Linux
+```
+
+Pages are written in Markdown ([MyST](https://myst-parser.readthedocs.io/)) in `docs/`. The [API reference](api.md) is generated from the docstrings, and the [command-line reference](cli.md) from the script's argument parser, so both update automatically when the code changes.
+

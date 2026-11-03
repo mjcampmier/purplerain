@@ -27,6 +27,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+docs = [
+    "furo>=2024.8.6",
+    "myst-parser>=3.0",
+    "sphinx>=7.3",
+    "sphinx-argparse>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/mjcampmier/purplerain"
+Documentation = "https://mjcampmier.github.io/purplerain/"
+Issues = "https://github.com/mjcampmier/purplerain/issues"
 
 [tool.setuptools]
 packages = ["purplerain"]

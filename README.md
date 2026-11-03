@@ -1,8 +1,11 @@
 # purplerain
 
 [![CI](https://github.com/mjcampmier/purplerain/actions/workflows/ci.yml/badge.svg)](https://github.com/mjcampmier/purplerain/actions/workflows/ci.yml)
+[![Docs](https://github.com/mjcampmier/purplerain/actions/workflows/docs.yml/badge.svg)](https://mjcampmier.github.io/purplerain/)
 
 Resumable bulk downloads of historical data from the [PurpleAir API](https://api.purpleair.com/).
+
+**Documentation: <https://mjcampmier.github.io/purplerain/>**
 
 - `PurpleAirClient`: a small API client with retries, rate limiting, and support for private sensors (read keys).
 - `PurpleAirNetworkDownloader`: downloads long histories for many sensors in month-aligned chunks and never overwrites existing files. It records progress after every chunk, so an interrupted run picks up where it left off.
@@ -49,7 +52,13 @@ You can re-run the same command to resume an interrupted download or retry faile
 
 ### GitHub Actions
 
-`.github/workflows/` contains a CI workflow (lint and tests) and a download workflow that fetches the previous month's data on a schedule. The download workflow can also be started manually for any date range. See [docs/github-actions.md](docs/github-actions.md) for setup, including how to store the API key and sensor table as repository secrets.
+`.github/workflows/` contains three workflows:
+
+- **CI:** lint and tests.
+- **Download:** fetches the previous month's data on a schedule, or any date range when started manually.
+- **Docs:** builds the documentation site and publishes it to GitHub Pages.
+
+See [docs/github-actions.md](docs/github-actions.md) for setup, including how to store the API key and sensor table as repository secrets.
 
 ### Library
 
@@ -102,6 +111,7 @@ The downloader never overwrites an existing data file. If a chunk's file is alre
 pytest              # run the test suite (no network access needed)
 ruff check .        # lint
 ruff format .       # format
+sphinx-build -W -b html docs docs/_build/html   # build the docs (needs ".[docs]")
 ```
 
 ## License
